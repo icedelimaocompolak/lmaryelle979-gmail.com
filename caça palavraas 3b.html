@@ -1,0 +1,595 @@
+
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Caça-Palavras</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    background: white;
+    width: 100%;
+    max-width: 700px;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px #0003;
+    text-align: center;
+}
+
+h1 {
+    color: #5b4bc4;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #777;
+    margin-bottom: 25px;
+}
+
+.info {
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.info div {
+    background: #f1efff;
+    padding: 12px 5px;
+    border-radius: 10px;
+    flex: 1;
+    color: #5b4bc4;
+    font-weight: bold;
+}
+
+.game {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 5px;
+    margin-bottom: 25px;
+    user-select: none;
+}
+
+.cell {
+    aspect-ratio: 1;
+    background: #eeeaff;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: clamp(12px, 3vw, 20px);
+    font-weight: bold;
+    color: #4d3eaa;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.cell:hover {
+    background: #d9d2ff;
+}
+
+.cell.selected {
+    background: #ffca5c;
+    color: #333;
+}
+
+.cell.found {
+    background: #42c98a;
+    color: white;
+    cursor: default;
+}
+
+h3 {
+    color: #444;
+    margin-bottom: 12px;
+}
+
+.words {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.word {
+    background: #f1efff;
+    padding: 9px 15px;
+    border-radius: 20px;
+    color: #5b4bc4;
+    font-weight: bold;
+}
+
+.word.found {
+    background: #42c98a;
+    color: white;
+    text-decoration: line-through;
+}
+
+button {
+    border: none;
+    padding: 13px 25px;
+    border-radius: 10px;
+    background: #6654d9;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: .2s;
+}
+
+button:hover {
+    background: #4c3bb4;
+    transform: scale(1.04);
+}
+
+#message {
+    margin-top: 15px;
+    color: #42a879;
+    font-weight: bold;
+    min-height: 20px;
+}
+
+.instructions {
+    background: #f8f7ff;
+    padding: 12px;
+    border-radius: 10px;
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 450px) {
+    .container {
+        padding: 15px;
+    }
+
+    .game {
+        gap: 3px;
+    }
+
+    .cell {
+        border-radius: 4px;
+    }
+
+    .info div {
+        font-size: 12px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🔎 Caça-Palavras</h1>
+
+    <p class="subtitle">
+        Encontre todas as palavras escondidas!
+    </p>
+
+    <div class="info">
+
+        <div>
+            Pontos: <span id="score">0</span>
+        </div>
+
+        <div>
+            Tempo: <span id="timer">00:00</span>
+        </div>
+
+        <div>
+            Encontradas: <span id="count">0</span>/6
+        </div>
+
+    </div>
+
+    <div class="instructions">
+        Clique na primeira letra e depois na última letra da palavra.
+    </div>
+
+    <div class="game" id="game"></div>
+
+    <h3>Palavras para encontrar:</h3>
+
+    <div class="words" id="words"></div>
+
+    <button onclick="newGame()">🔄 Novo Jogo</button>
+
+    <p id="message"></p>
+
+</div>
+
+<script>
+
+// CONFIGURAÇÕES
+
+const SIZE = 10;
+
+const wordList = [
+    "HTML",
+    "CSS",
+    "JAVASCRIPT",
+    "CODIGO",
+    "SITE",
+    "WEB"
+];
+
+let board = [];
+let foundWords = [];
+let score = 0;
+let seconds = 0;
+let timerInterval;
+let firstCell = null;
+
+const game = document.getElementById("game");
+
+// LETRAS ALEATÓRIAS
+
+function randomLetter() {
+    return String.fromCharCode(
+        65 + Math.floor(Math.random() * 26)
+    );
+}
+
+// CRIAR TABULEIRO
+
+function createBoard() {
+
+    board = Array.from(
+        { length: SIZE },
+        () => Array(SIZE).fill("")
+    );
+
+    wordList.forEach(word => {
+
+        let placed = false;
+
+        while (!placed) {
+
+            const horizontal = Math.random() > 0.5;
+
+            const row = Math.floor(Math.random() * SIZE);
+            const col = Math.floor(Math.random() * SIZE);
+
+            const dr = horizontal ? 0 : 1;
+            const dc = horizontal ? 1 : 0;
+
+            if (
+                row + dr * (word.length - 1) >= SIZE ||
+                col + dc * (word.length - 1) >= SIZE
+            ) {
+                continue;
+            }
+
+            let valid = true;
+
+            for (let i = 0; i < word.length; i++) {
+
+                const letter = board[
+                    row + dr * i
+                ][
+                    col + dc * i
+                ];
+
+                if (letter && letter !== word[i]) {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (!valid) continue;
+
+            for (let i = 0; i < word.length; i++) {
+
+                board[
+                    row + dr * i
+                ][
+                    col + dc * i
+                ] = word[i];
+
+            }
+
+            placed = true;
+        }
+    });
+
+    // PREENCHER ESPAÇOS VAZIOS
+
+    for (let r = 0; r < SIZE; r++) {
+
+        for (let c = 0; c < SIZE; c++) {
+
+            if (!board[r][c]) {
+                board[r][c] = randomLetter();
+            }
+
+        }
+    }
+}
+
+// MOSTRAR TABULEIRO
+
+function renderBoard() {
+
+    game.innerHTML = "";
+
+    for (let r = 0; r < SIZE; r++) {
+
+        for (let c = 0; c < SIZE; c++) {
+
+            const cell = document.createElement("div");
+
+            cell.className = "cell";
+            cell.textContent = board[r][c];
+
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+
+            game.appendChild(cell);
+        }
+    }
+}
+
+// MOSTRAR PALAVRAS
+
+function renderWords() {
+
+    const container = document.getElementById("words");
+
+    container.innerHTML = "";
+
+    wordList.forEach(word => {
+
+        const item = document.createElement("span");
+
+        item.className = "word";
+        item.textContent = word;
+        item.id = "word-" + word;
+
+        container.appendChild(item);
+    });
+}
+
+// LIMPAR SELEÇÃO
+
+function clearSelection() {
+
+    document.querySelectorAll(".cell.selected")
+        .forEach(cell => {
+            cell.classList.remove("selected");
+        });
+
+    firstCell = null;
+}
+
+// SELEÇÃO COM DOIS CLIQUES
+
+game.addEventListener("click", function(e) {
+
+    const cell = e.target.closest(".cell");
+
+    if (!cell) return;
+
+    if (cell.classList.contains("found")) return;
+
+    // PRIMEIRO CLIQUE
+
+    if (!firstCell) {
+
+        firstCell = cell;
+
+        cell.classList.add("selected");
+
+        document.getElementById("message").textContent =
+            "Agora clique na última letra da palavra!";
+
+        return;
+    }
+
+    // SEGUNDO CLIQUE
+
+    const startRow = Number(firstCell.dataset.row);
+    const startCol = Number(firstCell.dataset.col);
+
+    const endRow = Number(cell.dataset.row);
+    const endCol = Number(cell.dataset.col);
+
+    const dr = endRow - startRow;
+    const dc = endCol - startCol;
+
+    // VERIFICAR SE ESTÁ EM LINHA RETA
+
+    if (
+        dr !== 0 &&
+        dc !== 0 &&
+        Math.abs(dr) !== Math.abs(dc)
+    ) {
+
+        clearSelection();
+
+        document.getElementById("message").textContent =
+            "Selecione uma linha reta!";
+
+        return;
+    }
+
+    // QUANTIDADE DE LETRAS
+
+    const steps = Math.max(
+        Math.abs(dr),
+        Math.abs(dc)
+    );
+
+    const stepRow = Math.sign(dr);
+    const stepCol = Math.sign(dc);
+
+    const newSelection = [];
+
+    // PEGAR TODAS AS LETRAS ENTRE OS CLIQUES
+
+    for (let i = 0; i <= steps; i++) {
+
+        const row = startRow + stepRow * i;
+        const col = startCol + stepCol * i;
+
+        const current = document.querySelector(
+            `.cell[data-row="${row}"][data-col="${col}"]`
+        );
+
+        if (!current || current.classList.contains("found")) {
+
+            clearSelection();
+
+            document.getElementById("message").textContent =
+                "Essa seleção não é válida!";
+
+            return;
+        }
+
+        newSelection.push(current);
+    }
+
+    // FORMAR PALAVRA
+
+    const word = newSelection
+        .map(c => c.textContent)
+        .join("");
+
+    const reversed = word
+        .split("")
+        .reverse()
+        .join("");
+
+    // VERIFICAR PALAVRA
+
+    const found = wordList.find(w =>
+        (w === word || w === reversed) &&
+        !foundWords.includes(w)
+    );
+
+    if (found) {
+
+        foundWords.push(found);
+
+        score += 10;
+
+        newSelection.forEach(c => {
+
+            c.classList.remove("selected");
+            c.classList.add("found");
+
+        });
+
+        document.getElementById("word-" + found)
+            .classList.add("found");
+
+        document.getElementById("score").textContent =
+            score;
+
+        document.getElementById("count").textContent =
+            foundWords.length;
+
+        document.getElementById("message").textContent =
+            "🎉 Parabéns! Você encontrou " + found + "!";
+
+        // VERIFICAR VITÓRIA
+
+        if (foundWords.length === wordList.length) {
+
+            clearInterval(timerInterval);
+
+            document.getElementById("message").textContent =
+                "🏆 PARABÉNS! VOCÊ ENCONTROU TODAS AS PALAVRAS!";
+        }
+
+    } else {
+
+        document.getElementById("message").textContent =
+            "Palavra incorreta! Tente novamente.";
+
+    }
+
+    clearSelection();
+
+});
+
+// CRONÔMETRO
+
+function startTimer() {
+
+    clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+
+        seconds++;
+
+        const min = String(
+            Math.floor(seconds / 60)
+        ).padStart(2, "0");
+
+        const sec = String(
+            seconds % 60
+        ).padStart(2, "0");
+
+        document.getElementById("timer").textContent =
+            min + ":" + sec;
+
+    }, 1000);
+}
+
+// NOVO JOGO
+
+function newGame() {
+
+    clearInterval(timerInterval);
+
+    score = 0;
+    seconds = 0;
+    foundWords = [];
+    firstCell = null;
+
+    document.getElementById("score").textContent = "0";
+
+    document.getElementById("count").textContent = "0";
+
+    document.getElementById("timer").textContent = "00:00";
+
+    document.getElementById("message").textContent = "";
+
+    createBoard();
+
+    renderBoard();
+
+    renderWords();
+
+    startTimer();
+}
+
+// INICIAR JOGO
+
+newGame();
+
+</script>
+
+</body>
+</html>
